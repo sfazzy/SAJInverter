@@ -9,8 +9,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
-from .coordinator import SAJCoordinator
+from custom_components.saj_inverter.const import DOMAIN
+from custom_components.saj_inverter.coordinator import SAJCoordinator
 
 _DESCRIPTION_OVERRIDES: dict[str, SensorEntityDescription] = {
     "p-ac": SensorEntityDescription(
