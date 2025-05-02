@@ -4,9 +4,8 @@
   "version": "0.1.0",
   "documentation": "https://github.com/sfazzy/saj_inverter",
   "requirements": [],
-  "codeowners": [
-    "@sfazzy"
-  ],
+  "codeowners": [ "@sfazzy" ],
+  "config_flow": true,
   "iot_class": "local_polling",
   "dependencies": []
 }

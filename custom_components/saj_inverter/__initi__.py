@@ -14,8 +14,13 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS: list[str] = ["sensor"]
 
 
-async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Allow YAML (optional, can be empty)."""
+async def async_setup(hass, config):
+    conf = config.get(DOMAIN)
+    if not conf:
+        return True
+    coordinator = SAJCoordinator(hass, conf["host"])
+    await coordinator.async_config_entry_first_refresh()
+    hass.data.setdefault(DOMAIN, {})["yaml"] = coordinator
     return True
 
 

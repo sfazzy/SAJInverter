@@ -1,3 +1,4 @@
+"""Expose every DOM id from param.js as a HA sensor."""
 from __future__ import annotations
 
 from homeassistant.components.sensor import (
@@ -9,38 +10,49 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from custom_components.saj_inverter.const import DOMAIN
-from custom_components.saj_inverter.coordinator import SAJCoordinator
+from .const import DOMAIN
+from .coordinator import SAJCoordinator
 
-_DESCRIPTION_OVERRIDES: dict[str, SensorEntityDescription] = {
-    "p-ac": SensorEntityDescription(
-        key="p-ac",
-        name="Grid Total Power",
-        native_unit_of_measurement="W",
-        state_class=SensorStateClass.MEASUREMENT,
-        icon="mdi:solar-power",
-    ),
-    "e-today": SensorEntityDescription(
-        key="e-today",
-        name="Energy Today",
-        native_unit_of_measurement="kWh",
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        icon="mdi:counter",
-    ),
-    # Add more overrides here to polish names/units.
-}
+
+def _friendly(key: str) -> str:
+    return (
+        key.replace("v-", "Voltage ")
+        .replace("i-", "Current ")
+        .replace("p-", "Power ")
+        .replace("e-", "Energy ")
+        .replace("-", " ")
+        .title()
+    )
+
+
+def _unit(key: str) -> str | None:
+    if key.startswith(("v-", "vbus", "vac")):
+        return "V"
+    if key.startswith(("i-", "iac")):
+        return "A"
+    if key.startswith(("p-", "pac")):
+        return "W"
+    if key.startswith("e-"):
+        return "kWh"
+    return None
+
 
 class SAJSensor(SensorEntity):
     _attr_has_entity_name = True
 
-    def __init__(
-        self,
-        coordinator: SAJCoordinator,
-        description: SensorEntityDescription,
-    ) -> None:
-        self.entity_description = description
+    def __init__(self, coordinator: SAJCoordinator, key: str) -> None:
         self.coordinator = coordinator
-        self._attr_unique_id = f"{DOMAIN}_{description.key}"
+        self.entity_description = SensorEntityDescription(
+            key=key,
+            name=_friendly(key),
+            native_unit_of_measurement=_unit(key),
+            state_class=SensorStateClass.MEASUREMENT
+            if _unit(key) in ("V", "A", "W")
+            else SensorStateClass.TOTAL_INCREASING
+            if _unit(key) == "kWh"
+            else None,
+        )
+        self._attr_unique_id = f"{DOMAIN}_{key}"
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -53,22 +65,9 @@ class SAJSensor(SensorEntity):
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator: SAJCoordinator = hass.data[DOMAIN][entry.entry_id]
 
-    # Build one sensor per key returned by API
-    entities: list[SAJSensor] = []
-    for key, value in coordinator.data.items():
-        desc = _DESCRIPTION_OVERRIDES.get(
-            key,
-            SensorEntityDescription(
-                key=key,
-                name=key.replace("-", " ").title(),
-            ),
-        )
-        entities.append(SAJSensor(coordinator, desc))
-
-    async_add_entities(entities, update_before_add=True)
+    # Make one entity per key the API discovered
+    async_add_entities([SAJSensor(coordinator, k) for k in coordinator.data], True)
