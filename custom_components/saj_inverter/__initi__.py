@@ -4,12 +4,13 @@ from __future__ import annotations
 import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import logger as hass_logger
 
 from .const import DOMAIN
 from .coordinator import SAJCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+COMP_LOGGER = logging.getLogger("custom_components.saj_inverter")
+
 PLATFORMS: list[str] = ["sensor"]
 
 
@@ -17,7 +18,7 @@ PLATFORMS: list[str] = ["sensor"]
 
 
 async def async_setup(hass: HomeAssistant, _config: dict) -> bool:
-    """YAML setup (unused but must return True)."""
+    """Stub for old‑style YAML (unused but must return True)."""
     return True
 
 
@@ -26,11 +27,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = SAJCoordinator(hass, entry.data["host"])
     await coordinator.async_config_entry_first_refresh()
 
-    # ── Options ---------------------------------------------------------------
-    if entry.options.get("debug_logging"):
-        hass_logger.set_logger_level("custom_components.saj_inverter", logging.DEBUG)
+    # ── Apply debug toggle ---------------------------------------------
+    if entry.options.get("debug_logging", False):
+        COMP_LOGGER.setLevel(logging.DEBUG)
     else:
-        hass_logger.set_logger_level("custom_components.saj_inverter", logging.INFO)
+        COMP_LOGGER.setLevel(logging.INFO)
 
     # Store and forward to platforms
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
@@ -39,8 +40,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Handle removal / reload."""
+    """Unload the integration (called on remove / reload)."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id)
+        hass.data[DOMAIN].pop(entry.entry_id, None)
     return unload_ok
