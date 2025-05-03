@@ -1,6 +1,6 @@
 # SAJ Inverter (Local) – Home Assistant Custom Integration  
 
-![HACS badge](https://img.shields.io/badge/HACS-Custom-orange.svg)
+[![HACS badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/sfazzy/SAJInverter)
 ![HA min version](https://img.shields.io/badge/HA%20version-2023.7%2B-blue)
 ![IoT class](https://img.shields.io/badge/IoT%20class-Local--Polling-brightgreen)
 
@@ -28,7 +28,7 @@
 ### Option A  – HACS (recommended)
 
 1. **HACS → Integrations → “⋮” → Custom repositories**  
-   *URL:* `https://github.com/<your‑user>/saj_inverter`  
+   *URL:* `https://github.com/sfazzy/SAJInverter`  
    *Category:* **Integration**  
 2. Click **“Install”**.  
 3. **Restart Home‑Assistant**.
@@ -55,14 +55,14 @@ Method	Steps
 UI (preferred)	
 
 1. Settings → Devices & Services → “Add Integration” → SAJ Inverter (Local).
-2. Enter the inverter’s IP address (192.168.2.89 in the default install) and click Submit.
+2. Enter the inverter’s IP address (192.168.XXX.XXX in the default install) and click Submit.
 
 YAML
 (if you disabled config_flow in manifest.json)	
 yaml<br>
 ```text
 saj_inverter:
-  host: 192.168.1.123 # your inverter’s IP
+  host: 192.168.XXX.XXX # your inverter’s IP
   scan_interval: 60 # optional, seconds
 ```
 Tip: if you don’t know the IP, check your router’s DHCP table or run a
