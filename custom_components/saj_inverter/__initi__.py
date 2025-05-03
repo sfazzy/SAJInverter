@@ -1,41 +1,45 @@
-"""SAJ inverter integration – Home Assistant (HACS)."""
+"""SAJ Inverter – Home Assistant custom integration."""
 from __future__ import annotations
 
-import asyncio
 import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.typing import ConfigType
+from homeassistant.helpers import logger as hass_logger
 
-from const import DOMAIN
-from coordinator import SAJCoordinator
+from .const import DOMAIN
+from .coordinator import SAJCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 PLATFORMS: list[str] = ["sensor"]
 
 
-async def async_setup(hass, config):
-    conf = config.get(DOMAIN)
-    if not conf:
-        return True
-    coordinator = SAJCoordinator(hass, conf["host"])
-    await coordinator.async_config_entry_first_refresh()
-    hass.data.setdefault(DOMAIN, {})["yaml"] = coordinator
+# -----------------------------------------------------------------------------
+
+
+async def async_setup(hass: HomeAssistant, _config: dict) -> bool:
+    """YAML setup (unused but must return True)."""
     return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up the integration from UI flow or YAML."""
+    """Set up a SAJ inverter from the UI config‑flow."""
     coordinator = SAJCoordinator(hass, entry.data["host"])
     await coordinator.async_config_entry_first_refresh()
 
+    # ── Options ---------------------------------------------------------------
+    if entry.options.get("debug_logging"):
+        hass_logger.set_logger_level("custom_components.saj_inverter", logging.DEBUG)
+    else:
+        hass_logger.set_logger_level("custom_components.saj_inverter", logging.INFO)
+
+    # Store and forward to platforms
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload."""
+    """Handle removal / reload."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)
