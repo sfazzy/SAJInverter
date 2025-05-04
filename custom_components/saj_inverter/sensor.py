@@ -54,6 +54,9 @@ class SAJSensor(SensorEntity):
         )
         self._attr_unique_id = f"{DOMAIN}_{key}"
 
+        # ── NEW: force object_id “sajinv_<key>” ────────────────────────
+        self._attr_entity_id = f"sensor.sajinv_{key}"
+
     @callback
     def _handle_coordinator_update(self) -> None:
         self._attr_native_value = self.coordinator.data.get(self.entity_description.key)
