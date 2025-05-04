@@ -7,6 +7,7 @@
   "codeowners": [ "@sfazzy" ],
   "config_flow": true,
   "options_flow": true,
+  "logo": "icon.png",
   "iot_class": "local_polling",
   "dependencies": []
 }
