@@ -1,20 +1,19 @@
-"""SAJ inverter – network interface."""
+"""SAJ inverter – network interface (robust encoding + clean session)."""
 from __future__ import annotations
 
 import asyncio
 import logging
-import re
 from typing import Final
+from xml.etree import ElementTree as ET
 
 import aiohttp
 import async_timeout
-from xml.etree import ElementTree as ET
 
 _LOGGER = logging.getLogger(__name__)
 
-PARAM_JS:   Final = "/param.js"
-REALTIME:   Final = "/real_time_data.xml"
-TIMEOUT:    Final = 10
+PARAM_JS: Final = "/param.js"
+REALTIME: Final = "/real_time_data.xml"
+TIMEOUT: Final = 10
 
 
 class SAJApiError(RuntimeError):
@@ -24,34 +23,39 @@ class SAJApiError(RuntimeError):
 class SAJApi:
     """Fetch order array (once) and live XML (repeat)."""
 
-    def __init__(self, host: str, session: aiohttp.ClientSession) -> None:
+    def __init__(self, host: str, session: aiohttp.ClientSession | None = None):
         self._base = f"http://{host}"
-        self._session = session
+        # allow injector session for easier unit‑testing
+        self._session = session or aiohttp.ClientSession()
         self._order: list[str] | None = None
 
-    # ------------------------------------------------------------------
+    async def async_close(self) -> None:
+        """Close the underlying aiohttp session."""
+        if not self._session.closed:
+            await self._session.close()
+
+    # ------------------------------------------------------------------ public
     async def fetch(self) -> dict[str, float | int | str]:
-        """Public: return dict keyed by DOM id (“v-pv1”, “p-ac”…)."""
-        if self._order is None:           # first call → download param.js
+        """Return dict keyed by DOM id (“v-pv1”, “p-ac”…)."""
+        if self._order is None:
             await self._load_order()
 
-        values = await self._load_realtime()         # list[str]
+        values = await self._load_realtime()
         if len(values) != len(self._order):
             raise SAJApiError(
                 f"Length mismatch: {len(values)} values vs {len(self._order)} ids"
             )
 
-        return {
-            name: self._auto(v)
-            for name, v in zip(self._order, values, strict=False)
-        }
+        return {name: self._auto(v) for name, v in zip(self._order, values, strict=True)}
 
-    # ------------------------------------------------------------------
+    # ------------------------------------------------------------------ helper
     async def _load_order(self) -> None:
         """Parse param.js → list of DOM ids in the order sent by XML."""
         text = await self._get_text(PARAM_JS)
-        # Example line: var paraID=new Array("v-pv1","v-pv2",...);
-        m = re.search(r'new Array\((.*?)\)', text, re.S)
+
+        import re
+
+        m = re.search(r"new Array\((.*?)\)", text, re.S)
         if not m:
             raise SAJApiError("Cannot find Array(...) in param.js")
 
@@ -68,20 +72,20 @@ class SAJApi:
 
         return [e.text or "" for e in root.iter() if e.tag.lower() == "value"]
 
-    # ------------------------------------------------------------------
+    # ------------------------------------------------------------------ core I/O
     async def _get_text(self, path: str) -> str:
-        """GET <base><path> and return it as str with robust decoding."""
+        """GET <base><path> and decode safely (UTF‑8, UTF‑16, Latin‑1)."""
         url = f"{self._base}{path}"
         _LOGGER.debug("GET %s", url)
 
         try:
             async with async_timeout.timeout(TIMEOUT):
                 async with self._session.get(url) as resp:
-                    raw: bytes = await resp.read()  # << always raw bytes
+                    raw: bytes = await resp.read()  # *** always raw bytes ***
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
             raise SAJApiError(f"Request {url} failed: {err}") from err
 
-        # ── Decode manually  ------------------------------------------
+        # ---- manual decode -------------------------------------------
         if raw.startswith(b"\xff\xfe") or raw.startswith(b"\xfe\xff"):
             return raw.decode("utf-16")
         try:
