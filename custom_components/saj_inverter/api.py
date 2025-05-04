@@ -70,24 +70,24 @@ class SAJApi:
 
     # ------------------------------------------------------------------
     async def _get_text(self, path: str) -> str:
-        """HTTP helper with automatic encoding sniff."""
+        """GET <base><path> and return it as str with robust decoding."""
         url = f"{self._base}{path}"
         _LOGGER.debug("GET %s", url)
 
         try:
             async with async_timeout.timeout(TIMEOUT):
                 async with self._session.get(url) as resp:
-                    raw: bytes = await resp.read()          # ← get raw bytes
+                    raw: bytes = await resp.read()  # << always raw bytes
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
             raise SAJApiError(f"Request {url} failed: {err}") from err
 
-        # ── Decode robustly ────────────────────────────────────────────────
+        # ── Decode manually  ------------------------------------------
         if raw.startswith(b"\xff\xfe") or raw.startswith(b"\xfe\xff"):
-            return raw.decode("utf‑16")                      # UTF‑16 with BOM
+            return raw.decode("utf-16")
         try:
-            return raw.decode("utf‑8")
+            return raw.decode("utf-8")
         except UnicodeDecodeError:
-            return raw.decode("latin‑1")                     # last‑ditch
+            return raw.decode("latin-1", errors="replace")
 
     @staticmethod
     def _auto(value: str) -> float | int | str:
