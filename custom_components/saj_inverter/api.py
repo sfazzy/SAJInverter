@@ -34,43 +34,51 @@ class SAJApi:
         if not self._session.closed:
             await self._session.close()
 
-    # ------------------------------------------------------------------ public
+    # ------------------------------------------------------------------
     async def fetch(self) -> dict[str, float | int | str]:
-        """Return dict keyed by DOM id (“v-pv1”, “p-ac”…)."""
-        if self._order is None:
-            await self._load_order()
+        """Public API – always returns {tag: value} dict."""
+        try:
+            if self._order is None:
+                await self._load_order()          # may end up empty
+        except SAJApiError:
+            _LOGGER.debug("param.js had no Array(…); falling back to tag mode")
 
-        values = await self._load_realtime()
+        return await self._load_realtime()        # now returns dict
+
+    # ------------------------------------------------------------------
+    async def _load_order(self) -> None:
+        """Try to extract an Array(…) from param.js, else leave list empty."""
+        text = await self._get_text(PARAM_JS)
+        import re
+
+        m = re.search(r"new\s+Array\s*\((.*?)\)", text, re.S)
+        if not m:
+            self._order = []          # tells _load_realtime() to use tag mode
+            return
+
+        self._order = re.findall(r'"([^"]+)"', m.group(1))
+        _LOGGER.debug("param.js order loaded: %s", self._order)
+
+    # ------------------------------------------------------------------
+    async def _load_realtime(self) -> dict[str, str]:
+        """Return dict from <tag>value</tag> **or** zipped array mode."""
+        xml = await self._get_text(f"{REALTIME}?t=0")
+        from xml.etree import ElementTree as ET
+
+        root = ET.fromstring(xml)
+
+        # ── Mode A – each child already has its tag name (your firmware) ----
+        if not self._order:
+            return {child.tag: child.text or "" for child in root}
+
+        # ── Mode B – ‘<value>…’ list & order array (newer firmware) ---------
+        values = [e.text or "" for e in root.iter() if e.tag.lower() == "value"]
         if len(values) != len(self._order):
             raise SAJApiError(
                 f"Length mismatch: {len(values)} values vs {len(self._order)} ids"
             )
 
-        return {name: self._auto(v) for name, v in zip(self._order, values, strict=True)}
-
-    # ------------------------------------------------------------------ helper
-    async def _load_order(self) -> None:
-        """Parse param.js → list of DOM ids in the order sent by XML."""
-        text = await self._get_text(PARAM_JS)
-
-        import re
-
-        m = re.search(r"new Array\((.*?)\)", text, re.S)
-        if not m:
-            raise SAJApiError("Cannot find Array(...) in param.js")
-
-        self._order = re.findall(r'"([^"]+)"', m.group(1))
-        _LOGGER.debug("param.js order loaded: %s", self._order)
-
-    async def _load_realtime(self) -> list[str]:
-        """Return list of strings from <value>..</value>."""
-        xml = await self._get_text(f"{REALTIME}?t=0")
-        try:
-            root = ET.fromstring(xml)
-        except ET.ParseError as err:
-            raise SAJApiError(err) from err
-
-        return [e.text or "" for e in root.iter() if e.tag.lower() == "value"]
+        return dict(zip(self._order, values, strict=True))
 
     # ------------------------------------------------------------------ core I/O
     async def _get_text(self, path: str) -> str:
