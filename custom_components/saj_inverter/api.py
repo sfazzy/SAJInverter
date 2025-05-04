@@ -103,7 +103,7 @@ class SAJApi:
 
     @staticmethod
     def _auto(value: str) -> float | int | str:
-        """Convert numeric strings, leave others untouched."""
+        """Convert numeric strings, leave others untouched. """
         v = value.strip()
         try:
             if "." in v:
