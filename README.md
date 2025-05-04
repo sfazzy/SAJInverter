@@ -69,13 +69,17 @@ Tip: if you don’t know the IP, check your router’s DHCP table or run a
 network scan (arp -a, Fing, etc.).
 <br>
 <br>
-🖥️ Entities created
-<br>
-sensor.voltage_pv1, sensor.current_pv11, sensor.grid_total_power,
-sensor.energy_today, sensor.inverter_state, etc.
+🖥️ Entities are prefixed for clarity, e.g.
+```
++sensor.sajinv_vac_l1          248.5   V
++sensor.sajinv_iac_l1           16.85  A
++sensor.sajinv_p_ac          12 475    W
++sensor.sajinv_energy_today   102.3    kWh
++sensor.sajinv_inverter_state  Normal
+```
 
-Exact names depend on what your param.js lists; every ID found there
-(e.g. v-pv1, p-ac) becomes a sensor.
++Use the `_power_`, `_energy_`, `_vac_`, `_iac_` sensors in the Energy Dashboard
++or automations as usual.
 <br>
 <br>
 
